@@ -26,8 +26,11 @@ mesh['B_mag'] = B_mag
 
 
 ################### plot stream tubes #####################
+# stream, src = mesh.streamlines('vectors', return_source=1, n_points=31,
+#                                pointa= (0,0,1), pointb=(30,0,1),progress_bar=1, terminal_speed = -1)
+
 stream, src = mesh.streamlines('vectors', return_source=1, n_points=31,
-                               pointa= (0,0,1), pointb=(30,0,1),progress_bar=1, terminal_speed = -1)
+                               source_radius=10,progress_bar=1, terminal_speed = -1)
 # pv.set_jupyter_backend('none')
 p = pv.Plotter()
 p.add_mesh(mesh.outline(), color="w")
