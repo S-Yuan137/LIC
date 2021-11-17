@@ -1,11 +1,18 @@
 import numpy as np 
 from scipy.interpolate import interpn
+
+import multiprocessing
+import ctypes
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import pyvista as pv
+import time
+
 
 def distance(Coord1, Coord2):
     return np.sqrt(np.sum((np.array(Coord1) - np.array(Coord2))**2))
+
 
 def normalize(ux, uy, uz):
     mag = np.sqrt(ux**2 + uy**2 + uz**2)
@@ -38,6 +45,8 @@ def LIC_singleLine(input_texture, streamline):
         return (interpn(xyz, input_texture, streamline)[1:] + interpn(xyz, input_texture, streamline)[0:-1])/2
     
     Intensity = np.sum(np.hamming(streamline.shape[0]-1) * T(input_texture, streamline) * arc_interval(streamline))
+    # Intensity = np.sum(1 * T(input_texture, streamline) * arc_interval(streamline)) # the kernel is a constant 
+
     return Intensity
 
 class vectorfield(object):  
@@ -106,16 +115,32 @@ class vectorfield(object):
         s_neg = self.streamline_neg(startpoint, length)[1:,:]
         return np.vstack((s_neg[::-1], s_pos))
 
+# def LIC3d(vectorfield, length):
+#     np.random.seed(10)
+#     input_texture = np.random.randint(0,2,size = vectorfield.size)
+#     output_texture = np.zeros(vectorfield.size)
+#     for i in np.arange(vectorfield.size[0]):
+#         for j in np.arange(vectorfield.size[1]):
+#             for k in np.arange(vectorfield.size[2]):
+#                 output_texture[i][j][k] = LIC_singleLine(input_texture, vectorfield.streamline((i,j,k), length))
+#     return output_texture
+
 def LIC3d(vectorfield, length):
     np.random.seed(10)
     input_texture = np.random.randint(0,2,size = vectorfield.size)
-    output_texture = np.zeros(vectorfield.size)
+    output_texture = np.zeros(vectorfield.size, dtype = np.float64)
+    output_texture = multiprocessing.Array('d', output_texture)
+
+    def parallel_line(output_texture, coord):
+        output_texture[coord] = LIC_singleLine(input_texture, vectorfield.streamline((coord), length))
+        # print(output_texture[coord])
+    coordList = []
     for i in np.arange(vectorfield.size[0]):
         for j in np.arange(vectorfield.size[1]):
             for k in np.arange(vectorfield.size[2]):
-                # print(LIC_singleLine(input_texture, vectorfield.streamline((i,j,k), length)))
-                output_texture[i][j][k] = LIC_singleLine(input_texture, vectorfield.streamline((i,j,k), length))
-                
+                coordList.append((i,j,k))
+    p = multiprocessing.Process(target=parallel_line, args=(output_texture, coordList))
+    
     return output_texture
 
 
@@ -123,7 +148,10 @@ def LIC3d(vectorfield, length):
 
 
 
+
+
 if __name__ == "__main__":
+    start = time.time()
     shape = (10,10,10)
     np.random.seed(1)
     # ux = np.random.rand(5, 6, 7)
@@ -135,7 +163,8 @@ if __name__ == "__main__":
     test_field = vectorfield(shape, ux, uy, uz)
 
     data = LIC3d(test_field, 5)
-    print(data.shape)
+    data = data/np.nanmax(data)
+    print('It took {0:0.1f} seconds'.format(time.time() - start))
 
     # fig = plt.figure()
     # ax = fig.gca(projection='3d')
@@ -146,38 +175,21 @@ if __name__ == "__main__":
 
     # ax.quiver(x, y, z, ux, uy, uz, length=0.5)
     # plt.show()
-    
-    
-    mesh = pv.UniformGrid(shape, (1, 1, 1), (0,0,0))
-    x = mesh.points[:, 0]
-    y = mesh.points[:, 1]
-    z = mesh.points[:, 2]
-    vectors = np.empty((mesh.n_points, 3))
-    vectors[:, 0] = ux.flatten()
-    vectors[:, 1] = uy.flatten()
-    vectors[:, 2] = uz.flatten()
 
-    mesh['vectors'] = vectors
-    stream, src = mesh.streamlines('vectors', return_source=True,
-                                   terminal_speed=0, n_points=100,
-                                   source_radius=2)
+    ############# matplot ##########
+    filled = np.ones(shape, dtype=np.bool)
 
+    # repeating values 3 times for grayscale
+    colors = np.repeat(data[:, :, :, np.newaxis], 3, axis=3)
 
-    p = pv.Plotter()
-    p.add_mesh(mesh.outline(), color="k")
-    p.add_mesh(stream.tube(radius=0.01), scalars="vectors", lighting=False)
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
 
+    ax.voxels(filled, facecolors=colors, edgecolors='k', alpha = 0.8)
+    plt.show()
 
-    # vector = np.fromfile(r"D:\CUHK\VolumeLIC\VolumeLIC/tornado.dat", dtype = np.float32)
-    mesh.point_data["greys"] = data.flatten() # filter the array!
-    # mesh = mesh.point_data_to_cell_data(progress_bar = 1)
-    mesh.plot(show_edges=True, cmap = "Greys", opacity = 'linear')
-    p.add_volume(mesh, cmap="Greys", opacity='linear')
-
-
-    p.show()
-    
-    
+  
+   
 
 
 
