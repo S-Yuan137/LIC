@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.interpolate import interpn
+import numba as nb 
+from numba.experimental import jitclass
 import time
 
 
@@ -24,21 +26,18 @@ def normalize(ux, uy, uz):
 #     curve_arc: a nes set of coordinates, which the intervel of each adjcent points is unit arc.
 #     '''
 
-def LIC_singleLine(input_texture, streamline):
-    def arc_interval(streamline):
-        return np.sum((streamline[1:] - streamline[0:-1])**2, axis =1)
-    
-    def T(input_texture, streamline):
-        xyz = ( np.linspace(0,input_texture.shape[0]-1, input_texture.shape[0]), 
-                np.linspace(0,input_texture.shape[1]-1, input_texture.shape[1]),
-                np.linspace(0,input_texture.shape[2]-1, input_texture.shape[2])
-        )
-        # point data to interval data, using the cerntre-average
-        return (interpn(xyz, input_texture, streamline)[1:] + interpn(xyz, input_texture, streamline)[0:-1])/2
-    
-    Intensity = np.sum(np.hamming(streamline.shape[0]-1) * T(input_texture, streamline) * arc_interval(streamline))
-    return Intensity
 
+
+
+spec = [
+    ('size', nb.int32[:]),               
+    ('magnitude', nb.float64[:,:,:]), 
+    ('field_x', nb.float64[:,:,:]), 
+    ('field_y', nb.float64[:,:,:]), 
+    ('field_z', nb.float64[:,:,:])
+]
+
+@jitclass(spec)
 class vectorfield(object):  
     '''
     vectorfield is a class to store a 3d vector field. 
@@ -46,12 +45,16 @@ class vectorfield(object):
     '''
     # the vector field must be normalized
     def __init__(self, size, field_x, field_y, field_z):
-        assert size == field_x.shape == field_y.shape == field_z.shape
+        # assert size == field_x.shape == field_y.shape == field_z.shape
         self.size = size
         self.magnitude = np.sqrt(field_x**2 + field_y**2 + field_z**2)
         self.field_x = field_x / self.magnitude
         self.field_y = field_y / self.magnitude
         self.field_z = field_z / self.magnitude
+
+    # @property
+    # def size(self):
+    #     return self.array.size
 
     def in_field(self, coord):
         non_neg = coord[0] >=0 and coord[1]>=0 and coord[2]>=0
@@ -105,17 +108,33 @@ class vectorfield(object):
         s_neg = self.streamline_neg(startpoint, length)[1:,:]
         return np.vstack((s_neg[::-1], s_pos))
 
-def LIC3d(vectorfield, length):
-    np.random.seed(10)
-    input_texture = np.random.randint(0,2,size = vectorfield.size)
-    output_texture = np.zeros(vectorfield.size)
-    for i in np.arange(vectorfield.size[0]):
-        for j in np.arange(vectorfield.size[1]):
-            for k in np.arange(vectorfield.size[2]):
-                # print(LIC_singleLine(input_texture, vectorfield.streamline((i,j,k), length)))
-                output_texture[i][j][k] = LIC_singleLine(input_texture, vectorfield.streamline((i,j,k), length))
-                
-    return output_texture
+    def LIC3d(self, length):
+        np.random.seed(10)
+        input_texture = np.random.randint(0,2,size = self.size)
+        output_texture = np.zeros(self.size)
+        for i in np.arange(self.size[0]):
+            for j in np.arange(self.size[1]):
+                for k in np.arange(self.size[2]):
+                    temp =  self.streamline((i,j,k))
+                    output_texture[i][j][k] = self.LIC_singleLine(input_texture,temp, length)
+                    
+        return output_texture
+
+    @staticmethod
+    def LIC_singleLine(input_texture, streamline):
+        def arc_interval(streamline):
+            return np.sum((streamline[1:] - streamline[0:-1])**2, axis =1)
+    
+        def T(input_texture, streamline):
+            xyz = ( np.linspace(0,input_texture.shape[0]-1, input_texture.shape[0]), 
+                    np.linspace(0,input_texture.shape[1]-1, input_texture.shape[1]),
+                    np.linspace(0,input_texture.shape[2]-1, input_texture.shape[2])
+            )
+            # point data to interval data, using the cerntre-average
+            return (interpn(xyz, input_texture, streamline)[1:] + interpn(xyz, input_texture, streamline)[0:-1])/2
+    
+        Intensity = np.sum(np.hamming(streamline.shape[0]-1) * T(input_texture, streamline) * arc_interval(streamline))
+        return Intensity
 
 
 
@@ -123,7 +142,7 @@ def LIC3d(vectorfield, length):
 
 
 if __name__ == "__main__":
-    shape = (10,10,10)
+    shape = np.array([10,10,10])
     np.random.seed(1)
     # ux = np.random.rand(5, 6, 7)
     ux = np.ones(shape)
@@ -133,7 +152,7 @@ if __name__ == "__main__":
     uz = np.random.rand(shape[0], shape[1], shape[2])
     test_field = vectorfield(shape, ux, ux, ux)
     start_time = time.time()
-    data = LIC3d(test_field, 5)
+    data = test_field.LIC3d( 5)
 
     print(data.shape)
     print("--- %.2f seconds ---" % (time.time() - start_time))
