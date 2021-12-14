@@ -6,7 +6,7 @@ TODO rebuild my lic codes from numpy version to taichi version
     use taichi metaprogramming
 
 # ? it seems to be not necessary to create a class
-# ! still tey use class as an exercise
+# ! still try use class as an exercise
 
 '''
 
@@ -126,10 +126,10 @@ class vectorfield:
     #     else:
     #         pass
 
-    @ti.func
+    @ti.pyfunc
     def field_point_x(self, coord):
-        field = self.Vx
-        return trilerp(field, coord)
+        # field = self.Vx
+        return trilerp(self.Vx, coord)
 
 
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         # x =  ts.sampling.sample(field, P)
         x = test_field.field_point_x(P)
 
-        print(x)
-    main()
+        return x
+    print(main())
 
 

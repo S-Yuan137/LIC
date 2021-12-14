@@ -15,9 +15,18 @@ def vector_show(vectorfield):
     plt.show()
 
 def lic_show(licdata):
-    mesh = pv.UniformGrid(licdata.shape, (1, 1, 1), (0,0,0))
-    mesh.point_data["greys"] = licdata.flatten() # filter the array!
-    mesh.plot(show_edges=True, cmap = "Greys", opacity = 'linear')
+    if len(licdata.shape) == 3:
+        mesh = pv.UniformGrid(licdata.shape, (1, 1, 1), (0,0,0))
+        mesh.point_data["greys"] = licdata.flatten() # filter the array!
+        mesh.plot(show_edges=True, cmap = "Greys", opacity = 'linear')
+    elif len(licdata.shape) == 2:
+        # fig = plt.figure()
+        plt.imshow(licdata, cmap = 'Greys', origin= 'lower')
+        plt.show()
+
+
+
+
 
 def streamline(vectorfield):
     mesh = pv.UniformGrid(vectorfield.size, (1, 1, 1), (0,0,0))
