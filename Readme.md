@@ -15,10 +15,14 @@ colour: Matplotlib
 visualization: PyVista 
 
 ## current state (goals achieved)
-a 3d LIC using NumPy without parallel
+a 2d LIC using TensorFlow; a 2d LIC using Numba;
+all 2d versions can be modified with colourmap inputting(for the TensorFlow one I have finished it.)
+
+A 3d LIC using NumPy without parallel is finished. What's more, I still don't find the proper way to render the 3D LIC texture.
 
 ## current problems
 1. Efficiency
-
+2. 3D Rendering 
+3. (Not fatal) 2D version can be improved
 
 Try another method: rich streamlines 
