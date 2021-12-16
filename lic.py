@@ -1,3 +1,4 @@
+# this is original version for 3D LIC, without acceleration
 import numpy as np
 from scipy.interpolate import interpn
 import time
@@ -117,18 +118,17 @@ def LIC3d(vectorfield, length):
                 
     return output_texture
 
-def LIC2d(vectorfield, length):
-    # 2d: field_z = 0
-    np.random.seed(10)
-    input_texture = np.random.randint(0,2,size = vectorfield.size)
-    output_texture = np.zeros(vectorfield.size)
-    for i in np.arange(vectorfield.size[0]):
-        for j in np.arange(vectorfield.size[1]):
-            # for k in np.zeros(vectorfield.size[2]):
-            # print(LIC_singleLine(input_texture, vectorfield.streamline((i,j,k), length)))
-            output_texture[i][j][0] = LIC_singleLine(input_texture, vectorfield.streamline((i,j,0), length))
-                
-    return output_texture[:,:,0]
+def LIC2d(Vx, Vy, pix_len = 5):
+    Vx = np.asarray(Vx)
+    Vy = np.asarray(Vy)
+    assert Vx.shape == Vy.shape
+    m, n = Vx.shape
+    
+    noise = np.random.rand(*(Vx.shape))
+    def in_field(coord):
+        non_neg = coord[0] >=0 and coord[1]>=0 
+        in_size = coord[0] <= m-1 and coord[1] <= n-1 
+        return non_neg and in_size
 
 
 
