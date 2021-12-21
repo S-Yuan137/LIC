@@ -13,7 +13,9 @@ import shutil
 
 
 def get_noise(field_component):
-    return np.random.rand(*(field_component.shape))
+    # return np.random.rand(*(field_component.shape))
+    return np.random.randint(0, 2, size = field_component.shape)
+
 
 
 @jit(nopython=True, fastmath=True, nogil=True, cache=True, parallel=True)
@@ -67,6 +69,7 @@ def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
     m, n = vector_field_x.shape
     if noise is None:
         noise = np.random.rand(*(vector_field_x.shape))
+        # noise = np.where(noise<0.5, 0, 1)
 
     result = np.zeros((m, n))
     for i in range(m):
@@ -129,7 +132,14 @@ def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
     return result
 
 
-
+##---------------------- notes in the visualization section ------------------------------##
+## the array is n-dimensional number array with shape (Nx, Ny) or (Nx, Ny, Nz)            ##
+## so have to align the x-axis of data with real figure x-axis (as well as y and z),      ##
+##  (1) in plt.show section, need transpose and "origin = 'lower' "                       ##
+##  (2) in cv2 section, need frame alignment as well, details shown in codes              ##
+##  and due to the flexibility of cv2, can simply use ROTATE_90_COUNTERCLOCKWISE to       ##
+##  achieve the same effects as plt.show section                                          ##
+##----------------------------------------------------------------------------------------##
 def streamlines(Vx, Vy):
     Vx, Vy = Vx.T, Vy.T
     x = np.linspace(0, Vx.shape[0]-1, Vx.shape[0])
@@ -156,7 +166,6 @@ def show_color(tex, colorData = None):
         lic_data_rgba[...,3] = lic_data_clip_rescale * alpha 
         plt.imshow(lic_data_rgba, origin='lower',cmap='jet',alpha=alpha)
 
-
 def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder = "animated_lic", noise=None):
     if os.path.exists(output_folder):
         shutil.rmtree(output_folder)
@@ -164,7 +173,8 @@ def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder 
     if noise is None:
         noise = get_noise(vector_field_x)
     for t in range(100):
-        lic_image = lic_2d(vector_field_x, vector_field_y, t=(t/5), len_pix=20, noise=noise).T
+        lic_image = lic_2d(vector_field_x, vector_field_y, t=(t/5), len_pix=20, noise=noise)
+        lic_image = cv2.rotate(lic_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
         cv2.imwrite(path.join(output_folder, "images", "%d.png" % t), lic_image * 255)
 
     subprocess.run(["ffmpeg",
@@ -172,11 +182,6 @@ def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder 
                     "-r", "30",
                     "-y", path.join(output_folder, "animated_lic.mp4")])
     
-
-
-
-
-
 
 if __name__ == "__main__":
     with h5py.File("D:\CUHK\Data_from_zcao\struct01\struct01_snap52.h5", 'r') as f:
@@ -188,9 +193,10 @@ if __name__ == "__main__":
     B_y = bilinear_interpolation(B_y, 3)
     rho = bilinear_interpolation(rho, 3)
     
-    show_color(lic_2d(B_x, B_y, t = 0, len_pix=50, noise = None), colorData=rho)
+    show_color(np.log10(lic_2d(B_x, B_y, t = 0, len_pix=50, noise = rho)))
 
-    # streamlines(B_x, B_y)
+    streamlines(B_x, B_y)
+    # generate_animation(B_x, B_y)
     print()
     print("--- %.2f seconds ---" % (time.time() - start_time))
     plt.show()
