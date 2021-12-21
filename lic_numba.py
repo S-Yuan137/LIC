@@ -13,10 +13,7 @@ import shutil
 
 
 def get_noise(field_component):
-    # return np.random.rand(*(field_component.shape))
-    return np.random.randint(0, 2, size = field_component.shape)
-
-
+    return np.random.rand(*(field_component.shape))
 
 @jit(nopython=True, fastmath=True, nogil=True, cache=True, parallel=True)
 def bilinear_interpolation(f_in, resampleFactor):
@@ -56,8 +53,10 @@ def bilinear_interpolation(f_in, resampleFactor):
     
     return f_out
 
+
 @njit
 def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
+    # here the meaning of noise as an arguement is that one can customize noise dispite of the compatibility of numba
     vector_field_x = np.asarray(vector_field_x)
     vector_field_y = np.asarray(vector_field_y)
 
@@ -69,7 +68,6 @@ def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
     m, n = vector_field_x.shape
     if noise is None:
         noise = np.random.rand(*(vector_field_x.shape))
-        # noise = np.where(noise<0.5, 0, 1)
 
     result = np.zeros((m, n))
     for i in range(m):
@@ -140,6 +138,7 @@ def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
 ##  and due to the flexibility of cv2, can simply use ROTATE_90_COUNTERCLOCKWISE to       ##
 ##  achieve the same effects as plt.show section                                          ##
 ##----------------------------------------------------------------------------------------##
+
 def streamlines(Vx, Vy):
     Vx, Vy = Vx.T, Vy.T
     x = np.linspace(0, Vx.shape[0]-1, Vx.shape[0])
@@ -160,11 +159,11 @@ def show_color(tex, colorData = None):
         colorData = colorData.T
         lim = (0.2,0.8)
         lic_data_clip = np.clip(tex,lim[0],lim[1])
-        alpha = 1
+        alpha = 0.8
         lic_data_rgba = cm.ScalarMappable(norm=None,cmap='jet').to_rgba(colorData)
         lic_data_clip_rescale = (lic_data_clip - lim[0]) / (lim[1] - lim[0])
         lic_data_rgba[...,3] = lic_data_clip_rescale * alpha 
-        plt.imshow(lic_data_rgba, origin='lower',cmap='jet',alpha=alpha)
+        plt.imshow(lic_data_rgba, origin='lower')
 
 def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder = "animated_lic", noise=None):
     if os.path.exists(output_folder):
@@ -184,6 +183,7 @@ def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder 
     
 
 if __name__ == "__main__":
+
     with h5py.File("D:\CUHK\Data_from_zcao\struct01\struct01_snap52.h5", 'r') as f:
         B_x = f['i_mag_field'][:,:,50]
         B_y = f['j_mag_field'][:,:,50]
@@ -192,12 +192,15 @@ if __name__ == "__main__":
     B_x = bilinear_interpolation(B_x, 3)
     B_y = bilinear_interpolation(B_y, 3)
     rho = bilinear_interpolation(rho, 3)
-    
-    show_color(np.log10(lic_2d(B_x, B_y, t = 0, len_pix=50, noise = rho)))
 
-    streamlines(B_x, B_y)
-    # generate_animation(B_x, B_y)
-    print()
+    white_noise = np.random.randint(0 ,10, size = B_x.shape)
+    white_noise = np.where(white_noise<7, 0 , 1).astype(np.float64) # customize the input noise
+    lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=50, noise = white_noise)
+    
+    show_color(lic_tex, rho)
+    
+
+    print("computation elapsed time: ")
     print("--- %.2f seconds ---" % (time.time() - start_time))
     plt.show()
     
