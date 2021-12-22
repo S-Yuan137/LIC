@@ -197,7 +197,7 @@ if __name__ == "__main__":
     white_noise = np.where(white_noise<7, 0 , 1).astype(np.float64) # customize the input noise
     lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=50, noise = white_noise)
     
-    show_color(lic_tex, rho)
+    show_color(lic_tex, np.log10(rho))
     
 
     print("computation elapsed time: ")
