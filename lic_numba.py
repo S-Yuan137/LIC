@@ -21,7 +21,6 @@ def bilinear_interpolation(f_in, resampleFactor):
     y_in = np.linspace(0, f_in.shape[1]-1, f_in.shape[1])
     x_out = np.linspace(0, f_in.shape[0]-1, f_in.shape[0]*resampleFactor)
     y_out = np.linspace(0, f_in.shape[1]-1, f_in.shape[1]*resampleFactor)
-
     f_out = np.zeros((y_out.size, x_out.size))
     
     for i in prange(f_out.shape[1]):
@@ -133,7 +132,7 @@ def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
 ##---------------------- notes in the visualization section ------------------------------##
 ## the array is n-dimensional number array with shape (Nx, Ny) or (Nx, Ny, Nz)            ##
 ## so have to align the x-axis of data with real figure x-axis (as well as y and z),      ##
-##  (1) in plt.show section, need transpose and "origin = 'lower' "                       ##
+##  (1) in plt.imshow section, need transpose and "origin = 'lower' "                       ##
 ##  (2) in cv2 section, need frame alignment as well, details shown in codes              ##
 ##  and due to the flexibility of cv2, can simply use ROTATE_90_COUNTERCLOCKWISE to       ##
 ##  achieve the same effects as plt.show section                                          ##
@@ -155,15 +154,20 @@ def show_color(tex, colorData = None):
         tex = tex.T
         plt.imshow(tex, origin = 'lower', cmap='Greys')
     else:
-        tex = tex.T
+        tex =  tex.T * 2
+
         colorData = colorData.T
-        lim = (0.2,0.8)
-        lic_data_clip = np.clip(tex,lim[0],lim[1])
-        alpha = 0.8
-        lic_data_rgba = cm.ScalarMappable(norm=None,cmap='jet').to_rgba(colorData)
-        lic_data_clip_rescale = (lic_data_clip - lim[0]) / (lim[1] - lim[0])
-        lic_data_rgba[...,3] = lic_data_clip_rescale * alpha 
-        plt.imshow(lic_data_rgba, origin='lower')
+        # normalize the color data
+        colorData = (colorData - np.min(colorData)) / (np.max(colorData) - np.min(colorData))
+        lic_rgba = cm.jet(colorData)
+        lic_rgba[...,0] = np.clip(tex * lic_rgba[...,0], 0, 1)
+        lic_rgba[...,1] = np.clip(tex * lic_rgba[...,1], 0, 1)
+        lic_rgba[...,2] = np.clip(tex * lic_rgba[...,2], 0, 1)
+        lic_rgba[...,3] = 1
+        lic_rgba = np.array(lic_rgba)
+        
+        plt.imshow(lic_rgba, origin='lower', cmap='jet')
+
 
 def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder = "animated_lic", noise=None):
     if os.path.exists(output_folder):
@@ -188,15 +192,16 @@ if __name__ == "__main__":
         B_x = f['i_mag_field'][:,:,50]
         B_y = f['j_mag_field'][:,:,50]
         rho = f['gas_density'][:,:,50]
+    
     start_time = time.time()
-    B_x = bilinear_interpolation(B_x, 3)
-    B_y = bilinear_interpolation(B_y, 3)
-    rho = bilinear_interpolation(rho, 3)
+    B_x = bilinear_interpolation(B_x, 10)
+    B_y = bilinear_interpolation(B_y, 10)
+    rho = bilinear_interpolation(rho, 10)
 
     white_noise = np.random.randint(0 ,10, size = B_x.shape)
     white_noise = np.where(white_noise<7, 0 , 1).astype(np.float64) # customize the input noise
-    lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=50, noise = white_noise)
-    
+    lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=70, noise = white_noise)
+    print(lic_tex.shape, B_x.shape, B_y.shape)
     show_color(lic_tex, np.log10(rho))
     
 

@@ -1,4 +1,4 @@
-# some codes for Line integral Covolution Visualziation
+# some codes for Line integral Covolution Visualisation
 
 Author: SB
 
