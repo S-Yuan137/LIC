@@ -15,42 +15,14 @@ import shutil
 def get_noise(field_component):
     return np.random.rand(*(field_component.shape))
 
-@jit(nopython=True, fastmath=True, nogil=True, cache=True, parallel=True)
-def bilinear_interpolation(f_in, resampleFactor):
-    x_in = np.linspace(0, f_in.shape[0]-1, f_in.shape[0])
-    y_in = np.linspace(0, f_in.shape[1]-1, f_in.shape[1])
-    x_out = np.linspace(0, f_in.shape[0]-1, f_in.shape[0]*resampleFactor)
-    y_out = np.linspace(0, f_in.shape[1]-1, f_in.shape[1]*resampleFactor)
-    f_out = np.zeros((y_out.size, x_out.size))
-    
-    for i in prange(f_out.shape[1]):
-        idx = np.searchsorted(x_in, x_out[i])
-        
-        x1 = x_in[idx-1]
-        x2 = x_in[idx]
-        x = x_out[i]
-        
-        for j in prange(f_out.shape[0]):
-            idy = np.searchsorted(y_in, y_out[j])
-            y1 = y_in[idy-1]
-            y2 = y_in[idy]
-            y = y_out[j]
+def bilinear_interpolation(data_in, resample_factor):
+        from scipy import interpolate
+        x_grid = np.linspace(0, data_in.shape[1]-1, data_in.shape[1])
+        y_grid = np.linspace(0, data_in.shape[0]-1, data_in.shape[0])
+        f = interpolate.interp2d(x_grid, y_grid, data_in, kind='linear')
+        return f(np.linspace(0, data_in.shape[1], data_in.shape[1] * resample_factor), 
+                    np.linspace(0, data_in.shape[0], data_in.shape[0] * resample_factor))
 
-            
-            f11 = f_in[idy-1, idx-1]
-            f21 = f_in[idy-1, idx]
-            f12 = f_in[idy, idx-1]
-            f22 = f_in[idy, idx]
-            
-
-            
-            f_out[j, i] = ((f11 * (x2 - x) * (y2 - y) +
-                            f21 * (x - x1) * (y2 - y) +
-                            f12 * (x2 - x) * (y - y1) +
-                            f22 * (x - x1) * (y - y1)) /
-                           ((x2 - x1) * (y2 - y1)))
-    
-    return f_out
 
 
 @njit
@@ -139,13 +111,12 @@ def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
 ##----------------------------------------------------------------------------------------##
 
 def streamlines(Vx, Vy):
+    # here the transpose is that the streamlines are based on f(x,y) while our x is the first dimension
     Vx, Vy = Vx.T, Vy.T
     x = np.linspace(0, Vx.shape[0]-1, Vx.shape[0])
     y = np.linspace(0, Vx.shape[1]-1, Vx.shape[1])
     x, y = np.meshgrid(y, x)
-    print(x.shape, y.shape, Vx.shape)
-
-    plt.streamplot(x, y, Vx, Vy, density=1)
+    plt.streamplot(x, y, Vx, Vy, density=0.5, color='w')
 
 def show_color(tex, colorData = None):
     plt.figure()
@@ -173,17 +144,41 @@ def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder 
     if os.path.exists(output_folder):
         shutil.rmtree(output_folder)
     os.makedirs(path.join(output_folder, "images"), exist_ok=True)
+    
     if noise is None:
         noise = get_noise(vector_field_x)
+    iter_num = 5
     for t in range(100):
-        lic_image = lic_2d(vector_field_x, vector_field_y, t=(t/5), len_pix=20, noise=noise)
-        lic_image = cv2.rotate(lic_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        cv2.imwrite(path.join(output_folder, "images", "%d.png" % t), lic_image * 255)
+        lic_image = lic_2d(vector_field_x, vector_field_y, t=(t/5), len_pix=len_pix, noise=noise)
+        for _ in range(iter_num-1):
+            lic_image = lic_2d(vector_field_x, vector_field_y, t=(t/5), len_pix=len_pix, noise=lic_image)
+        # save images by plt
+        show_color(lic_image, np.log10(rho))
+        plt.savefig(path.join(output_folder, "images", "image_%05d.png" % t))
+        plt.close()
+        # save images by cv2
+        # lic_image = cv2.rotate(lic_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        # cv2.imwrite(path.join(output_folder, "images", "%d.png" % time5), lic_image * 255)
 
-    subprocess.run(["ffmpeg",
-                    "-i", path.join(output_folder, "images", "%d.png"),
-                    "-r", "30",
-                    "-y", path.join(output_folder, "animated_lic.mp4")])
+    # subprocess.run(["ffmpeg",
+    #                 "-i", path.join(output_folder, "images", "image_%05d.png"),
+    #                 "-r", "30",
+    #                 "-y", path.join(output_folder, "animated_lic.mp4")])
+    image_folder = output_folder+"/images/"
+    def generate_video(image_folder, video_name, fps=30):
+        images = [img for img in os.listdir(image_folder) if img.endswith(".png")]
+        frame = cv2.imread(os.path.join(image_folder, images[0]))
+        height, width, layers = frame.shape
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        video = cv2.VideoWriter(video_name, fourcc, fps, (width,height))
+
+        for image in images:
+            video.write(cv2.imread(os.path.join(image_folder, image)))
+
+        cv2.destroyAllWindows()
+        video.release()
+
+    generate_video(image_folder, 'animated_lic.mp4')
     
 
 if __name__ == "__main__":
@@ -192,27 +187,31 @@ if __name__ == "__main__":
         B_x = f['i_mag_field'][:,:,50]
         B_y = f['j_mag_field'][:,:,50]
         rho = f['gas_density'][:,:,50]
-    
+        
     start_time = time.time()
-    B_x = bilinear_interpolation(B_x, 10)
-    B_y = bilinear_interpolation(B_y, 10)
-    rho = bilinear_interpolation(rho, 10)
+    white_noise = np.random.randint(0 ,10, size = B_x.shape)
+    white_noise = np.where(white_noise<7, 0 , 1).astype(np.float64) # customize the input noise
+    generate_animation(B_x, B_y, output_folder = "animated_lic", noise=white_noise)
+
+
+
+    ##------------------ visualization section ---------------------------------##
+    B_x = bilinear_interpolation(B_x, 5)
+    B_y = bilinear_interpolation(B_y, 5)
+    rho = bilinear_interpolation(rho, 5)
 
     white_noise = np.random.randint(0 ,10, size = B_x.shape)
     white_noise = np.where(white_noise<7, 0 , 1).astype(np.float64) # customize the input noise
-    lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=70, noise = white_noise)
+    lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=64, noise = white_noise)
+    niter_lic = 2
+    for _ in range(niter_lic - 1):
+        lic_tex = lic_2d(B_x, B_y, t = 0, len_pix=64, noise = lic_tex)
+
     print(lic_tex.shape, B_x.shape, B_y.shape)
     show_color(lic_tex, np.log10(rho))
+    # streamlines(B_x, B_y)
     
 
     print("computation elapsed time: ")
     print("--- %.2f seconds ---" % (time.time() - start_time))
     plt.show()
-    
-
-    
-    
-    
-
-
-
