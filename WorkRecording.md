@@ -31,7 +31,7 @@ A 3d LIC using NumPy without parallel is finished. What's more, I still don't fi
 
 1. Efficiency (partly solved)
 
-   Through experience from the 2D LIC, I found that it is nearly impossible to accelerate the computation with keeping interpolation. The efficient way is to upsample the whole vector fields before convolution if one would like to improve the textures.
+   Through experience from the 2D LIC, I found it impossible to accelerate the computation with keeping interpolation. The efficient way is to upsample the whole vector fields before convolution if one would like to improve the textures.
 
 2. 3D Rendering
 
