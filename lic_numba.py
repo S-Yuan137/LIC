@@ -136,9 +136,10 @@ def show_color(tex, colorData=None):
         # normalize the color data
         colorData = (colorData - np.min(colorData)) / (np.max(colorData) - np.min(colorData))
         lic_rgba = cm.jet(colorData)
-        lic_rgba[..., 0] = np.clip(tex * lic_rgba[..., 0], 0, 1)
-        lic_rgba[..., 1] = np.clip(tex * lic_rgba[..., 1], 0, 1)
-        lic_rgba[..., 2] = np.clip(tex * lic_rgba[..., 2], 0, 1)
+        brightness_factor = 1.5
+        lic_rgba[..., 0] = np.clip(brightness_factor * tex * lic_rgba[..., 0], 0, 1)
+        lic_rgba[..., 1] = np.clip(brightness_factor * tex * lic_rgba[..., 1], 0, 1)
+        lic_rgba[..., 2] = np.clip(brightness_factor * tex * lic_rgba[..., 2], 0, 1)
         lic_rgba[..., 3] = 1
         lic_rgba = np.array(lic_rgba)
         plt.imshow(lic_rgba, origin="lower", cmap="jet")
