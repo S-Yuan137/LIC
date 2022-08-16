@@ -132,6 +132,20 @@ def LIC3d(vectorfield, length):
 
 
 def LIC2d(Vx, Vy, pix_len=5):
+    '''It takes in two matrices, Vx and Vy, and returns a matrix of the same size, with each
+    element being the sum of the elements of Vx and Vy at the same position, plus a random
+    number between 0 and 1.
+
+    Parameters
+    ----------
+    coord
+        the coordinate of the pixel
+
+    Returns
+    -------
+        The function in_field is being returned.
+
+    '''
     Vx = np.asarray(Vx)
     Vy = np.asarray(Vy)
     assert Vx.shape == Vy.shape

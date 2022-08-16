@@ -15,6 +15,21 @@ def get_noise(field_component):
 
 
 def bilinear_interpolation(data_in, resample_factor):
+    '''It takes a 2D array and a resampling factor, and returns a 2D array of the same shape as the input
+    array, but with values interpolated using bilinear interpolation.
+
+    Parameters
+    ----------
+    data_in
+        the input data you want to resample
+    resample_factor
+        The factor by which you want to increase the image resolution.
+
+    Returns
+    -------
+        A 2D array with the same shape as the input array, but with values that are interpolated.
+
+    '''
     from scipy import interpolate
 
     x_grid = np.linspace(0, data_in.shape[1] - 1, data_in.shape[1])
@@ -29,6 +44,28 @@ def bilinear_interpolation(data_in, resample_factor):
 
 @njit
 def lic_2d(vector_field_x, vector_field_y, t=0, len_pix=5, noise=None):
+    """
+    The function takes in a vector field and a noise field, and returns a line integral convolution of
+    the vector field with the noise field
+
+    Parameters
+    ----------
+    vector_field_x
+        The x component of the vector field.
+    vector_field_y
+        the y component of the vector field
+    t, optional
+        time step
+    len_pix, optional
+        the length of the line integral convolution
+    noise
+        a 2D array of random values. If you don't provide one, it will generate one for you.
+
+    Returns
+    -------
+        The result is a 2D array of the same shape as the input vector field.
+
+    """
     # here the meaning of noise as an arguement is that one can customize noise
     # dispite of the compatibility of numba
     vector_field_x = np.asarray(vector_field_x)
