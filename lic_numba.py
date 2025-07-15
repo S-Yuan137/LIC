@@ -1,5 +1,4 @@
 import numpy as np
-import h5py
 from numba import njit
 import time
 import matplotlib.pyplot as plt
@@ -34,11 +33,17 @@ def bilinear_interpolation(data_in, resample_factor):
 
     x_grid = np.linspace(0, data_in.shape[1] - 1, data_in.shape[1])
     y_grid = np.linspace(0, data_in.shape[0] - 1, data_in.shape[0])
-    f = interpolate.interp2d(x_grid, y_grid, data_in, kind="linear")
-    out = f(
-        np.linspace(0, data_in.shape[1], data_in.shape[1] * resample_factor),
-        np.linspace(0, data_in.shape[0], data_in.shape[0] * resample_factor),
+    from scipy.interpolate import RegularGridInterpolator
+
+    interpolator = RegularGridInterpolator(
+        (y_grid, x_grid), data_in, method="linear", bounds_error=False, fill_value=None
     )
+
+    new_x = np.linspace(0, data_in.shape[1] - 1, data_in.shape[1] * resample_factor)
+    new_y = np.linspace(0, data_in.shape[0] - 1, data_in.shape[0] * resample_factor)
+    mesh_y, mesh_x = np.meshgrid(new_y, new_x, indexing="ij")
+    points = np.stack([mesh_y.ravel(), mesh_x.ravel()], axis=-1)
+    out = interpolator(points).reshape((data_in.shape[0] * resample_factor, data_in.shape[1] * resample_factor))
     return out
 
 
@@ -190,9 +195,9 @@ def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder=
         noise = get_noise(vector_field_x)
     iter_num = 5
     for t in range(100):
-        lic_image = lic_2d(vector_field_x, vector_field_y, t=(t / 5), len_pix=len_pix, noise=noise)
+        lic_image = lic_2d(vector_field_x, vector_field_y, t=(t / 50), len_pix=len_pix, noise=noise)
         for _ in range(iter_num - 1):
-            lic_image = lic_2d(vector_field_x, vector_field_y, t=(t / 5), len_pix=len_pix, noise=lic_image)
+            lic_image = lic_2d(vector_field_x, vector_field_y, t=(t / 50), len_pix=len_pix, noise=lic_image)
         # save images by plt
         show_color(lic_image, np.log10(rho))
         plt.savefig(path.join(output_folder, "images", "image_%05d.png" % t))
@@ -225,11 +230,10 @@ def generate_animation(vector_field_x, vector_field_y, len_pix=5, output_folder=
 
 if __name__ == "__main__":
 
-    with h5py.File(r"D:\CUHK\Data_from_zcao\struct01\struct01_snap52.h5", "r") as f:
-        B_x = f["i_mag_field"][:, :, 50]
-        B_y = f["j_mag_field"][:, :, 50]
-        rho = f["gas_density"][:, :, 50]
-
+    rho = np.load("./sample_data/density_sample.npy")
+    B_x = np.load("./sample_data/Bx_sample.npy")
+    B_y = np.load("./sample_data/By_sample.npy")
+    
     start_time = time.time()
     # ------------------ visualization section -------------------------------
     B_x = bilinear_interpolation(B_x, 5)
@@ -249,3 +253,4 @@ if __name__ == "__main__":
     print("computation elapsed time: ")
     print("--- %.2f seconds ---" % (time.time() - start_time))
     plt.show()
+    # generate_animation(B_x, B_y, len_pix=8, noise=white_noise)

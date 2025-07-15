@@ -1,0 +1,5 @@
+numpy>=2.2.0
+numba>=0.60.0
+matplotlib
+opencv-python>=4.12.0
+scipy>=1.15.0
